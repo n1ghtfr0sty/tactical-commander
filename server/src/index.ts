@@ -34,6 +34,14 @@ const UNIT_COUNT = 30;
 
 let units: Unit[] = [];
 let playerTeams: Map<string, number> = new Map();
+let playersReady: Set<string> = new Set();
+let gameStarted = false;
+
+function startGameIfReady() {
+  if (gameStarted || playersReady.size < 1) return;
+  gameStarted = true;
+  io.emit('gameStart');
+}
 
 function createArmy(team: number): Unit[] {
   const startX = team === 1 ? 100 : MAP_WIDTH - 100;
@@ -176,6 +184,15 @@ io.on('connection', (socket) => {
   
   socket.emit('init', { team, units });
 
+  socket.on('selectTeam', (data: { teamId: number }) => {
+    const assignedTeam = playerTeams.get(socket.id) || 1;
+    if (data.teamId === assignedTeam || !playersReady.has(socket.id)) {
+      playerTeams.set(socket.id, data.teamId);
+      playersReady.add(socket.id);
+      startGameIfReady();
+    }
+  });
+
   socket.on('armyCommand', (cmd: ArmyCommand) => {
     const playerTeam = playerTeams.get(socket.id) || 1;
 
@@ -218,6 +235,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     playerTeams.delete(socket.id);
+    playersReady.delete(socket.id);
   });
 });
 

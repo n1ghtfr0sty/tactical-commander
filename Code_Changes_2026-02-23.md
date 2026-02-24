@@ -17,3 +17,4 @@
 
 ### Bug Fixes
 - Fixed TypeScript error in TitleScene.ts (unused variable 'instruction')
+- Added game start functionality - server now emits 'gameStart' when player selects a team
