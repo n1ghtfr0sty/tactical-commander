@@ -229,12 +229,63 @@ io.on('connection', (socket) => {
   const team = assignedTeam;
   
   socket.emit('init', { team, units, teamColors: TEAM_COLORS });
+  emitTeamUpdate();
 
   socket.on('selectTeam', (data: { teamId: number }) => {
     const usedTeams = new Set(playerTeams.values());
     if (data.teamId >= 1 && data.teamId <= MAX_TEAMS && !usedTeams.has(data.teamId)) {
       playerTeams.set(socket.id, data.teamId);
       playersReady.add(socket.id);
+      emitTeamUpdate();
+      startGameIfReady();
+    }
+  });
+
+  socket.on('disconnect', () => {
+    playerTeams.delete(socket.id);
+    playersReady.delete(socket.id);
+    emitTeamUpdate();
+  });
+});
+
+function emitTeamUpdate() {
+  const teamCounts = new Map<number, number>();
+  playerTeams.forEach(team => {
+    teamCounts.set(team, (teamCounts.get(team) || 0) + 1);
+  });
+  
+  const teams = Array.from({ length: MAX_TEAMS }, (_, i) => ({
+    id: i + 1,
+    name: ['Royal Kingdom', 'Rebel Lords', 'Forest Clan', 'Desert Raiders', 
+           'Mountain Lords', 'Sea Pirates', 'Shadow Guild', 'Iron Empire'][i],
+    color: TEAM_COLORS[i],
+    players: teamCounts.get(i + 1) || 0
+  }));
+  
+  io.emit('teamUpdate', { teams });
+}
+
+io.on('connection', (socket) => {
+  const usedTeams = new Set(playerTeams.values());
+  let assignedTeam = 1;
+  for (let i = 1; i <= MAX_TEAMS; i++) {
+    if (!usedTeams.has(i)) {
+      assignedTeam = i;
+      break;
+    }
+  }
+  playerTeams.set(socket.id, assignedTeam);
+  const team = assignedTeam;
+  
+  socket.emit('init', { team, units, teamColors: TEAM_COLORS });
+  emitTeamUpdate();
+
+  socket.on('selectTeam', (data: { teamId: number }) => {
+    const usedTeams = new Set(playerTeams.values());
+    if (data.teamId >= 1 && data.teamId <= MAX_TEAMS && !usedTeams.has(data.teamId)) {
+      playerTeams.set(socket.id, data.teamId);
+      playersReady.add(socket.id);
+      emitTeamUpdate();
       startGameIfReady();
     }
   });
@@ -282,6 +333,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     playerTeams.delete(socket.id);
     playersReady.delete(socket.id);
+    emitTeamUpdate();
   });
 });
 
