@@ -174,6 +174,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnUnits(units: Unit[]) {
+    this.units.forEach((container) => container.destroy());
+    this.units.clear();
     units.forEach(unit => this.createUnitSprite(unit));
   }
 
@@ -221,11 +223,22 @@ export class GameScene extends Phaser.Scene {
 
   private syncUnits(serverUnits: Unit[]) {
     const serverIds = new Set(serverUnits.map(u => u.id));
+    const clientIds = new Set(this.units.keys());
 
-    this.units.forEach((container, id) => {
+    serverIds.forEach(id => {
+      if (!clientIds.has(id)) {
+        const unit = serverUnits.find(u => u.id === id);
+        if (unit) this.createUnitSprite(unit);
+      }
+    });
+
+    clientIds.forEach(id => {
       if (!serverIds.has(id)) {
-        container.destroy();
-        this.units.delete(id);
+        const container = this.units.get(id);
+        if (container) {
+          container.destroy();
+          this.units.delete(id);
+        }
       }
     });
 
@@ -240,8 +253,6 @@ export class GameScene extends Phaser.Scene {
         const healthPercent = Math.max(0, unit.health / maxHealth);
         healthBar.width = 10 * healthPercent;
         healthBar.fillColor = healthPercent > 0.5 ? 0x00ff00 : healthPercent > 0.25 ? 0xffaa00 : 0xff0000;
-      } else {
-        this.createUnitSprite(unit);
       }
     });
   }
