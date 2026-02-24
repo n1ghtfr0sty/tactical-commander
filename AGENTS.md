@@ -216,6 +216,13 @@ server/
 - Commit related changes together
 - Do not commit: node_modules, dist, .env files
 
+### Code Change Workflow
+
+When making code changes:
+1. Create a `Code_Changes_YYYY-MM-DD.md` file in the root directory
+2. Document changes in the file (feature added, bug fixed, etc.)
+3. Commit changes to the repository with a descriptive message
+
 ### Dependencies
 
 - Check package.json before adding new dependencies
