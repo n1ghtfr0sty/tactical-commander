@@ -14,3 +14,6 @@
 
 ### Documentation
 - Updated AGENTS.md with code change workflow instructions
+
+### Bug Fixes
+- Fixed TypeScript error in TitleScene.ts (unused variable 'instruction')

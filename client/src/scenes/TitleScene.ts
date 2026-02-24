@@ -44,7 +44,7 @@ export class TitleScene extends Phaser.Scene {
       color: '#a89070'
     }).setOrigin(0.5);
 
-    const instruction = this.add.text(640, 230, 'Select Your Faction', {
+    this.add.text(640, 230, 'Select Your Faction', {
       font: '24px serif',
       color: '#c0b090'
     }).setOrigin(0.5);
