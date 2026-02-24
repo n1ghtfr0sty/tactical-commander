@@ -37,7 +37,8 @@ const ATTACK_RANGE_MELEE = 25;
 const ATTACK_RANGE_RANGED = 150;
 const RANGED_DAMAGE = 0.4;
 const MELEE_DAMAGE = 0.6;
-const UNIT_COUNT_PER_TYPE = 15;
+const MELEE_COUNT = 10;
+const RANGED_COUNT = 5;
 const MAX_TEAMS = 8;
 
 const TEAM_COLORS: number[] = [
@@ -45,15 +46,15 @@ const TEAM_COLORS: number[] = [
   0xaa55aa, 0x55aaaa, 0xaa7744, 0x777777
 ];
 
-const TEAM_POSITIONS: { x: number; y: number }[] = [
-  { x: 80, y: 120 },   // Team 1 - top left
-  { x: 1200, y: 120 }, // Team 2 - top right
-  { x: 80, y: 600 },   // Team 3 - bottom left
-  { x: 1200, y: 600 }, // Team 4 - bottom right
-  { x: 640, y: 80 },   // Team 5 - top center
-  { x: 640, y: 640 },  // Team 6 - bottom center
-  { x: 200, y: 360 },  // Team 7 - mid left
-  { x: 1080, y: 360 }, // Team 8 - mid right
+const SPAWN_ZONES: { x: number; y: number }[] = [
+  { x: 100, y: 150 },
+  { x: 1180, y: 150 },
+  { x: 100, y: 570 },
+  { x: 1180, y: 570 },
+  { x: 640, y: 100 },
+  { x: 640, y: 620 },
+  { x: 180, y: 360 },
+  { x: 1100, y: 360 },
 ];
 
 let units: Unit[] = [];
@@ -68,22 +69,39 @@ function startGameIfReady() {
 }
 
 function createArmy(team: number): Unit[] {
-  const pos = TEAM_POSITIONS[team - 1];
+  const zone = SPAWN_ZONES[team - 1];
   const units: Unit[] = [];
   
-  for (let i = 0; i < UNIT_COUNT_PER_TYPE * 2; i++) {
-    const type: UnitType = i < UNIT_COUNT_PER_TYPE ? 'melee' : 'ranged';
-    const row = i % UNIT_COUNT_PER_TYPE;
-    const col = Math.floor(i / UNIT_COUNT_PER_TYPE);
-    
+  const centerX = zone.x + (Math.random() * 40 - 20);
+  const centerY = zone.y + (Math.random() * 40 - 20);
+  
+  for (let i = 0; i < RANGED_COUNT; i++) {
+    const angle = (i / RANGED_COUNT) * Math.PI * 2;
+    const dist = 15 + Math.random() * 10;
     units.push({
-      id: `unit-${team}-${i}`,
-      x: pos.x + (col * 30) + (Math.random() * 10),
-      y: pos.y + (row * 25) + (Math.random() * 10),
+      id: `unit-${team}-ranged-${i}`,
+      x: centerX + Math.cos(angle) * dist,
+      y: centerY + Math.sin(angle) * dist,
       team,
-      type,
-      health: type === 'melee' ? 100 : 80,
-      maxHealth: type === 'melee' ? 100 : 80,
+      type: 'ranged',
+      health: 80,
+      maxHealth: 80,
+      state: 'idle'
+    });
+  }
+  
+  const meleeRadius = 50 + Math.random() * 20;
+  for (let i = 0; i < MELEE_COUNT; i++) {
+    const angle = (i / MELEE_COUNT) * Math.PI * 2;
+    const dist = meleeRadius + Math.random() * 15;
+    units.push({
+      id: `unit-${team}-melee-${i}`,
+      x: centerX + Math.cos(angle) * dist,
+      y: centerY + Math.sin(angle) * dist,
+      team,
+      type: 'melee',
+      health: 100,
+      maxHealth: 100,
       state: 'idle'
     });
   }
@@ -198,7 +216,7 @@ function processCommands() {
             unit.targetY = undefined;
           }
         } else {
-          const pos = TEAM_POSITIONS[unit.team - 1];
+          const pos = SPAWN_ZONES[unit.team - 1];
           unit.targetX = pos.x;
           unit.targetY = pos.y;
         }

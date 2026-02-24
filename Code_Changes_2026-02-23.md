@@ -18,6 +18,8 @@
 ### Bug Fixes
 - Fixed TypeScript error in TitleScene.ts (unused variable 'instruction')
 - Added game start functionality - server now emits 'gameStart' when player selects a team
+- Fixed teamUpdate events not being sent to clients
+- Added proper team availability checking when selecting teams
 
 ### Feature: Medieval Unit Design
 - Added 8 teams support with unique colors
@@ -27,3 +29,8 @@
 - Added health bars to all units (green/yellow/red based on health)
 - Updated server combat logic for different unit types
 - Updated team positions for 8 teams around the map
+
+### Feature: Unit Configuration
+- Reduced units to 10 melee and 5 ranged per team
+- Ranged units now spawn in center, melee surround them in a circle
+- Added random offset to each army's spawn position
