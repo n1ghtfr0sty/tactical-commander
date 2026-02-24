@@ -18,3 +18,12 @@
 ### Bug Fixes
 - Fixed TypeScript error in TitleScene.ts (unused variable 'instruction')
 - Added game start functionality - server now emits 'gameStart' when player selects a team
+
+### Feature: Medieval Unit Design
+- Added 8 teams support with unique colors
+- Added melee and ranged unit types
+- Melee units: square body with sword (higher health: 100, shorter range: 25)
+- Ranged units: triangle body with bow (lower health: 80, longer range: 150)
+- Added health bars to all units (green/yellow/red based on health)
+- Updated server combat logic for different unit types
+- Updated team positions for 8 teams around the map

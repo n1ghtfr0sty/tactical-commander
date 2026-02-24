@@ -13,12 +13,16 @@ interface Unit {
   x: number;
   y: number;
   team: number;
+  type: 'melee' | 'ranged';
   health: number;
+  maxHealth: number;
   targetX?: number;
   targetY?: number;
   state: 'idle' | 'moving' | 'attacking' | 'holding' | 'retreating' | 'flanking';
   attackTarget?: string;
 }
+
+type UnitType = 'melee' | 'ranged';
 
 interface ArmyCommand {
   type: 'move' | 'attack' | 'hold' | 'retreat' | 'flank';
@@ -28,9 +32,29 @@ interface ArmyCommand {
 
 const MAP_WIDTH = 1280;
 const MAP_HEIGHT = 720;
-const UNIT_SPEED = 60;
-const ATTACK_RANGE = 80;
-const UNIT_COUNT = 30;
+const UNIT_SPEED = 50;
+const ATTACK_RANGE_MELEE = 25;
+const ATTACK_RANGE_RANGED = 150;
+const RANGED_DAMAGE = 0.4;
+const MELEE_DAMAGE = 0.6;
+const UNIT_COUNT_PER_TYPE = 15;
+const MAX_TEAMS = 8;
+
+const TEAM_COLORS: number[] = [
+  0x3366aa, 0xaa3333, 0x33aa55, 0xaaaa33,
+  0xaa55aa, 0x55aaaa, 0xaa7744, 0x777777
+];
+
+const TEAM_POSITIONS: { x: number; y: number }[] = [
+  { x: 80, y: 120 },   // Team 1 - top left
+  { x: 1200, y: 120 }, // Team 2 - top right
+  { x: 80, y: 600 },   // Team 3 - bottom left
+  { x: 1200, y: 600 }, // Team 4 - bottom right
+  { x: 640, y: 80 },   // Team 5 - top center
+  { x: 640, y: 640 },  // Team 6 - bottom center
+  { x: 200, y: 360 },  // Team 7 - mid left
+  { x: 1080, y: 360 }, // Team 8 - mid right
+];
 
 let units: Unit[] = [];
 let playerTeams: Map<string, number> = new Map();
@@ -44,24 +68,34 @@ function startGameIfReady() {
 }
 
 function createArmy(team: number): Unit[] {
-  const startX = team === 1 ? 100 : MAP_WIDTH - 100;
-  const startY = MAP_HEIGHT / 2 + (team === 1 ? -100 : 100);
+  const pos = TEAM_POSITIONS[team - 1];
+  const units: Unit[] = [];
   
-  return Array.from({ length: UNIT_COUNT }, (_, i) => ({
-    id: `unit-${team}-${i}`,
-    x: startX + (i % 6) * 20 + Math.random() * 10,
-    y: startY + Math.floor(i / 6) * 20 + Math.random() * 10,
-    team,
-    health: 100,
-    state: 'idle'
-  }));
+  for (let i = 0; i < UNIT_COUNT_PER_TYPE * 2; i++) {
+    const type: UnitType = i < UNIT_COUNT_PER_TYPE ? 'melee' : 'ranged';
+    const row = i % UNIT_COUNT_PER_TYPE;
+    const col = Math.floor(i / UNIT_COUNT_PER_TYPE);
+    
+    units.push({
+      id: `unit-${team}-${i}`,
+      x: pos.x + (col * 30) + (Math.random() * 10),
+      y: pos.y + (row * 25) + (Math.random() * 10),
+      team,
+      type,
+      health: type === 'melee' ? 100 : 80,
+      maxHealth: type === 'melee' ? 100 : 80,
+      state: 'idle'
+    });
+  }
+  
+  return units;
 }
 
 function initGame() {
-  units = [
-    ...createArmy(1),
-    ...createArmy(2)
-  ];
+  units = [];
+  for (let team = 1; team <= MAX_TEAMS; team++) {
+    units.push(...createArmy(team));
+  }
 }
 
 function findNearestEnemy(unit: Unit): Unit | null {
@@ -85,6 +119,8 @@ function processCommands() {
   units.forEach(unit => {
     if (unit.health <= 0) return;
 
+    const attackRange = unit.type === 'melee' ? ATTACK_RANGE_MELEE : ATTACK_RANGE_RANGED;
+    const damage = unit.type === 'melee' ? MELEE_DAMAGE : RANGED_DAMAGE;
     const enemy = findNearestEnemy(unit);
     const enemyDist = enemy ? Math.hypot(enemy.x - unit.x, enemy.y - unit.y) : Infinity;
 
@@ -107,7 +143,7 @@ function processCommands() {
             unit.targetY = undefined;
           }
         }
-        if (enemy && enemyDist < ATTACK_RANGE) {
+        if (enemy && enemyDist < attackRange) {
           unit.state = 'attacking';
           unit.attackTarget = enemy.id;
         }
@@ -119,11 +155,11 @@ function processCommands() {
           unit.attackTarget = undefined;
           break;
         }
-        if (enemyDist > ATTACK_RANGE * 1.5) {
+        if (enemyDist > attackRange * 1.5) {
           unit.state = 'moving';
           unit.targetX = enemy.x;
           unit.targetY = enemy.y;
-        } else if (enemyDist > ATTACK_RANGE) {
+        } else if (enemyDist > attackRange) {
           const dx = enemy.x - unit.x;
           const dy = enemy.y - unit.y;
           const moveX = (dx / enemyDist) * UNIT_SPEED * 0.5 * (1/60);
@@ -131,13 +167,17 @@ function processCommands() {
           unit.x += moveX;
           unit.y += moveY;
         } else {
-          enemy.health -= 0.5;
+          enemy.health -= damage;
         }
         break;
 
       case 'holding':
-        if (enemy && enemyDist < ATTACK_RANGE) {
-          enemy.health -= 0.3;
+        if (enemy) {
+          const attackRange = unit.type === 'melee' ? ATTACK_RANGE_MELEE : ATTACK_RANGE_RANGED;
+          if (enemyDist < attackRange) {
+            const damage = unit.type === 'melee' ? MELEE_DAMAGE : RANGED_DAMAGE;
+            enemy.health -= damage * 0.5;
+          }
         }
         break;
 
@@ -157,12 +197,10 @@ function processCommands() {
             unit.targetX = undefined;
             unit.targetY = undefined;
           }
-        } else if (unit.team === 1) {
-          unit.targetX = 50;
-          unit.targetY = MAP_HEIGHT / 2;
         } else {
-          unit.targetX = MAP_WIDTH - 50;
-          unit.targetY = MAP_HEIGHT / 2;
+          const pos = TEAM_POSITIONS[unit.team - 1];
+          unit.targetX = pos.x;
+          unit.targetY = pos.y;
         }
         break;
     }
@@ -179,14 +217,22 @@ setInterval(() => {
 }, 1000 / 60);
 
 io.on('connection', (socket) => {
-  playerTeams.set(socket.id, playerTeams.size % 2 + 1);
-  const team = playerTeams.get(socket.id)!;
+  const usedTeams = new Set(playerTeams.values());
+  let assignedTeam = 1;
+  for (let i = 1; i <= MAX_TEAMS; i++) {
+    if (!usedTeams.has(i)) {
+      assignedTeam = i;
+      break;
+    }
+  }
+  playerTeams.set(socket.id, assignedTeam);
+  const team = assignedTeam;
   
-  socket.emit('init', { team, units });
+  socket.emit('init', { team, units, teamColors: TEAM_COLORS });
 
   socket.on('selectTeam', (data: { teamId: number }) => {
-    const assignedTeam = playerTeams.get(socket.id) || 1;
-    if (data.teamId === assignedTeam || !playersReady.has(socket.id)) {
+    const usedTeams = new Set(playerTeams.values());
+    if (data.teamId >= 1 && data.teamId <= MAX_TEAMS && !usedTeams.has(data.teamId)) {
       playerTeams.set(socket.id, data.teamId);
       playersReady.add(socket.id);
       startGameIfReady();

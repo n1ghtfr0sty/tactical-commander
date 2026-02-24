@@ -6,6 +6,7 @@ interface Unit {
   x: number;
   y: number;
   team: number;
+  type: 'melee' | 'ranged';
   health: number;
 }
 
@@ -15,9 +16,14 @@ interface GameState {
 
 type ArmyCommand = 'move' | 'attack' | 'hold' | 'retreat' | 'flank';
 
+const TEAM_COLORS: number[] = [
+  0x3366aa, 0xaa3333, 0x33aa55, 0xaaaa33,
+  0xaa55aa, 0x55aaaa, 0xaa7744, 0x777777
+];
+
 export class GameScene extends Phaser.Scene {
   private socket!: Socket;
-  private units: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  private units: Map<string, Phaser.GameObjects.Container> = new Map();
   private myTeam: number = 0;
   private commandButtons: Map<ArmyCommand, Phaser.GameObjects.Container> = new Map();
   private activeCommand: ArmyCommand | null = null;
@@ -39,8 +45,11 @@ export class GameScene extends Phaser.Scene {
       console.log('Connected to server');
     });
 
-    this.socket.on('init', (data: { team: number; units: Unit[] }) => {
+    this.socket.on('init', (data: { team: number; units: Unit[]; teamColors?: number[] }) => {
       this.myTeam = data.team;
+      if (data.teamColors) {
+        data.teamColors.forEach((color, i) => { TEAM_COLORS[i] = color; });
+      }
       this.spawnUnits(data.units);
     });
 
@@ -168,30 +177,69 @@ export class GameScene extends Phaser.Scene {
     units.forEach(unit => this.createUnitSprite(unit));
   }
 
-  private createUnitSprite(unit: Unit): Phaser.GameObjects.Sprite {
-    const color = unit.team === 1 ? 0x4488ff : 0xff4444;
-    const sprite = this.add.circle(0, 0, 6, color);
-    sprite.setData('unitId', unit.id);
-    sprite.setData('team', unit.team);
-    this.units.set(unit.id, sprite as any);
-    return sprite as any;
+  private createUnitSprite(unit: Unit): Phaser.GameObjects.Container {
+    const color = TEAM_COLORS[unit.team - 1] || 0x888888;
+    const container = this.add.container(unit.x, unit.y);
+
+    if (unit.type === 'melee') {
+      const body = this.add.rectangle(0, 0, 10, 10, color);
+      body.setStrokeStyle(1, 0x000000);
+      
+      const weapon = this.add.graphics();
+      weapon.lineStyle(1, 0xcccccc);
+      weapon.beginPath();
+      weapon.moveTo(4, -8);
+      weapon.lineTo(4, 2);
+      weapon.strokePath();
+      container.add([body, weapon]);
+    } else {
+      const body = this.add.triangle(0, 0, 0, -7, -5, 5, 5, 5, color);
+      body.setStrokeStyle(1, 0x000000);
+      
+      const weapon = this.add.graphics();
+      weapon.lineStyle(1.5, 0x8b4513);
+      weapon.beginPath();
+      weapon.arc(-6, 0, 5, -Math.PI / 2, Math.PI / 2, false);
+      weapon.strokePath();
+      container.add([body, weapon]);
+    }
+
+    const healthBar = this.add.rectangle(0, -12, 10, 3, 0x00ff00);
+    const maxHealth = unit.type === 'melee' ? 100 : 80;
+    const healthPercent = unit.health / maxHealth;
+    healthBar.width = 10 * healthPercent;
+    healthBar.fillColor = healthPercent > 0.5 ? 0x00ff00 : healthPercent > 0.25 ? 0xffaa00 : 0xff0000;
+
+    container.add(healthBar);
+
+    container.setData('unitId', unit.id);
+    container.setData('team', unit.team);
+    container.setData('type', unit.type);
+    this.units.set(unit.id, container);
+    return container;
   }
 
   private syncUnits(serverUnits: Unit[]) {
     const serverIds = new Set(serverUnits.map(u => u.id));
 
-    this.units.forEach((sprite, id) => {
+    this.units.forEach((container, id) => {
       if (!serverIds.has(id)) {
-        sprite.destroy();
+        container.destroy();
         this.units.delete(id);
       }
     });
 
     serverUnits.forEach(unit => {
-      const sprite = this.units.get(unit.id);
-      if (sprite) {
-        sprite.x = unit.x;
-        sprite.y = unit.y;
+      const container = this.units.get(unit.id);
+      if (container) {
+        container.x = unit.x;
+        container.y = unit.y;
+        
+        const healthBar = container.list[2] as Phaser.GameObjects.Rectangle;
+        const maxHealth = unit.type === 'melee' ? 100 : 80;
+        const healthPercent = Math.max(0, unit.health / maxHealth);
+        healthBar.width = 10 * healthPercent;
+        healthBar.fillColor = healthPercent > 0.5 ? 0x00ff00 : healthPercent > 0.25 ? 0xffaa00 : 0xff0000;
       } else {
         this.createUnitSprite(unit);
       }
